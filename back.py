@@ -27,7 +27,7 @@ from werkzeug.utils import secure_filename
 app = Flask(
     __name__,
     static_folder='front',       # carpeta actual como origen de archivos estáticos (main.html, estilos.css)
-    static_url_path=''       # la URL base para estáticos es la raíz; de modo que /estilos.css carga ./estilos.css
+    static_url_path='/static'       # la URL base para estáticos es la raíz; de modo que /estilos.css carga ./estilos.css
 )
 CORS(app)
 
