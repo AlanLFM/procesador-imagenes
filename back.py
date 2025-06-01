@@ -26,7 +26,7 @@ from werkzeug.utils import secure_filename
 #
 app = Flask(
     __name__,
-    static_folder='.',       # carpeta actual como origen de archivos estáticos (main.html, estilos.css)
+    static_folder='front',       # carpeta actual como origen de archivos estáticos (main.html, estilos.css)
     static_url_path=''       # la URL base para estáticos es la raíz; de modo que /estilos.css carga ./estilos.css
 )
 CORS(app)
@@ -191,7 +191,7 @@ def figura_a_base64(fig):
 @app.route('/', methods=['GET'])
 def index():
     # Devuelve main.html desde la carpeta actual
-    return send_from_directory('.', 'main.html')
+    return send_from_directory('front', 'main.html')
 
 # -------------------------------------------------------------------
 # 4. Rutas de la API (sin cambios)
