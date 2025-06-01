@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Procesador de Imágenes</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <header>
+        <h1>Procesador de Imágenes</h1>
+        <p>Seleccione una imagen, elija la operación y visualice el resultado.</p>
+    </header>
+
+    <main>
+        <!-- 1. Sección de subida de imagen primaria -->
+        <section id="seccion-subida">
+            <h2>1. Subir imagen primaria</h2>
+            <input type="file" id="input-imagen1" accept="image/*">
+            <button id="btn-subir1">Subir imagen</button>
+            <div id="preview-imagen1" class="preview-container" style="display: none;">
+                <h3>Vista previa de la imagen primaria:</h3>
+                <img id="img-preview1" alt="Preview Imagen 1">
+                <p><strong>Nombre de archivo asignado:</strong> <span id="filename1"></span></p>
+                <p><strong>Dimensiones (HxWxCanales):</strong> <span id="shape1"></span></p>
+            </div>
+            <div id="error-subida1" class="alert error" style="display: none;"></div>
+        </section>
+
+        <hr>
+
+        <!-- 2. Sección de selección de operación y parámetros -->
+        <section id="seccion-operacion" style="display: none;">
+            <h2>2. Seleccione la operación</h2>
+            <form id="form-operacion">
+                <div class="form-group">
+                    <label for="select-operacion">Operación:</label>
+                    <select id="select-operacion" name="operation">
+                        <option value="" disabled selected>-- Elija una operación --</option>
+                        <option value="histograma">Histograma</option>
+                        <option value="canales_rgb">Canales RGB</option>
+                        <option value="roberts">Filtro Roberts</option>
+                        <option value="canny">Detector Canny</option>
+                        <option value="multiumbral">Multiumbralización</option>
+                        <option value="aritmeticas">Operaciones Aritméticas</option>
+                        <option value="logicas">Operaciones Lógicas</option>
+                        <option value="ruido_sal_pimienta">Ruido Sal y Pimienta</option>
+                        <option value="ruido_gaussiano">Ruido Gaussiano</option>
+                        <option value="filtros">Filtros (Gaussiano/Promedio/Mediana)</option>
+                        <option value="ecualizacion">Ecualización Log-Hiperbólica</option>
+                    </select>
+                </div>
+
+                <!-- Parámetros adicionales -->
+                <div id="param-canny" class="form-group parametros" style="display: none;">
+                    <label>Umbrales Canny:</label>
+                    <input type="number" id="canny-low" placeholder="Low threshold (p.ej. 50)" value="50" min="0" max="255">
+                    <input type="number" id="canny-high" placeholder="High threshold (p.ej. 150)" value="150" min="0" max="255">
+                </div>
+
+                <div id="param-multiumbral" class="form-group parametros" style="display: none;">
+                    <label for="input-classes">Número de clases (2–10):</label>
+                    <input type="number" id="input-classes" value="3" min="2" max="10">
+                </div>
+
+                <div id="param-aritmeticas" class="form-group parametros" style="display: none;">
+                    <label for="input-escalar">Escalar (valor numérico):</label>
+                    <input type="number" id="input-escalar" value="50" step="1">
+                </div>
+
+                <div id="param-logicas" class="form-group parametros" style="display: none;">
+                    <p>Operación lógica requiere <strong>segunda imagen</strong>.</p>
+                    <input type="file" id="input-imagen2" accept="image/*">
+                    <button type="button" id="btn-subir2">Subir segunda imagen</button>
+                    <div id="preview-imagen2" class="preview-container" style="display: none;">
+                        <h4>Vista previa de la segunda imagen:</h4>
+                        <img id="img-preview2" alt="Preview Imagen 2">
+                        <p><strong>Nombre de archivo asignado:</strong> <span id="filename2"></span></p>
+                        <p><strong>Dimensiones (HxWxCanales):</strong> <span id="shape2"></span></p>
+                    </div>
+                    <div id="error-subida2" class="alert error" style="display: none;"></div>
+                </div>
+
+                <div id="param-ruido-salpimi" class="form-group parametros" style="display: none;">
+                    <label for="input-cantidad">Cantidad de ruido (0.0 – 1.0):</label>
+                    <input type="number" id="input-cantidad" value="0.05" step="0.01" min="0" max="1">
+                </div>
+
+                <div id="param-ruido-gauss" class="form-group parametros" style="display: none;">
+                    <label for="input-sigma">Sigma (p.ej. 25):</label>
+                    <input type="number" id="input-sigma" value="25" step="1" min="0">
+                </div>
+
+                <div id="param-filtros" class="form-group parametros" style="display: none;">
+                    <label for="select-filtro">Tipo de filtro:</label>
+                    <select id="select-filtro">
+                        <option value="gaussiano">Gaussiano</option>
+                        <option value="promedio">Promedio</option>
+                        <option value="mediana">Mediana</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <button type="button" id="btn-procesar">Procesar imagen</button>
+                </div>
+            </form>
+        </section>
+
+        <hr>
+
+        <!-- 3. Sección de visualización de resultados -->
+        <section id="seccion-resultado" style="display: none;">
+            <h2>3. Resultado</h2>
+            <div id="resultado-container"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 – Comunidad rosa</p>
+    </footer>
+
+    <script>
+        // URL base de la API Flask
+        const API_BASE = 'http://localhost:5000';
+
+        // Elementos del DOM
+        const inputImagen1    = document.getElementById('input-imagen1');
+        const btnSubir1       = document.getElementById('btn-subir1');
+        const preview1        = document.getElementById('preview-imagen1');
+        const imgPreview1     = document.getElementById('img-preview1');
+        const filename1Elem   = document.getElementById('filename1');
+        const shape1Elem      = document.getElementById('shape1');
+        const errorSubida1    = document.getElementById('error-subida1');
+
+        const seccionOperacion = document.getElementById('seccion-operacion');
+        const selectOperacion  = document.getElementById('select-operacion');
+
+        const paramCanny        = document.getElementById('param-canny');
+        const paramMulti        = document.getElementById('param-multiumbral');
+        const paramArit         = document.getElementById('param-aritmeticas');
+        const paramLog          = document.getElementById('param-logicas');
+        const paramRuidoSal     = document.getElementById('param-ruido-salpimi');
+        const paramRuidoGau     = document.getElementById('param-ruido-gauss');
+        const paramFiltros      = document.getElementById('param-filtros');
+
+        const inputCannyLow     = document.getElementById('canny-low');
+        const inputCannyHigh    = document.getElementById('canny-high');
+        const inputClasses      = document.getElementById('input-classes');
+        const inputEscalar      = document.getElementById('input-escalar');
+        const inputImagen2      = document.getElementById('input-imagen2');
+        const btnSubir2         = document.getElementById('btn-subir2');
+        const preview2          = document.getElementById('preview-imagen2');
+        const imgPreview2       = document.getElementById('img-preview2');
+        const filename2Elem     = document.getElementById('filename2');
+        const shape2Elem        = document.getElementById('shape2');
+        const errorSubida2      = document.getElementById('error-subida2');
+        const selectFiltro      = document.getElementById('select-filtro');
+
+        const btnProcesar       = document.getElementById('btn-procesar');
+        const seccionResultado  = document.getElementById('seccion-resultado');
+        const resultadoContainer= document.getElementById('resultado-container');
+
+        // Variables para almacenar filenames retornados
+        let filename1 = null;
+        let filename2 = null;
+
+        // Función genérica para mostrar/ocultar secciones según la operación
+        function actualizarParametrosVisibles() {
+            const op = selectOperacion.value;
+            // Ocultar todos los bloques de parámetros
+            document.querySelectorAll('.parametros').forEach(div => div.style.display = 'none');
+
+            if (op === 'canny') {
+                paramCanny.style.display = 'block';
+            } else if (op === 'multiumbral') {
+                paramMulti.style.display = 'block';
+            } else if (op === 'aritmeticas') {
+                paramArit.style.display = 'block';
+            } else if (op === 'logicas') {
+                paramLog.style.display = 'block';
+            } else if (op === 'ruido_sal_pimienta') {
+                paramRuidoSal.style.display = 'block';
+            } else if (op === 'ruido_gaussiano') {
+                paramRuidoGau.style.display = 'block';
+            } else if (op === 'filtros') {
+                paramFiltros.style.display = 'block';
+            }
+        }
+
+        // Cuando cambie la operación, mostramos/ocultamos parámetros
+        selectOperacion.addEventListener('change', actualizarParametrosVisibles);
+
+        // --------------- SUBIR PRIMERA IMAGEN ---------------
+        btnSubir1.addEventListener('click', async () => {
+            errorSubida1.style.display = 'none';
+            if (!inputImagen1.files.length) {
+                errorSubida1.textContent = 'Por favor seleccione un archivo antes de subir.';
+                errorSubida1.style.display = 'block';
+                return;
+            }
+            const file = inputImagen1.files[0];
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const respuesta = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await respuesta.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+                // Guardamos el filename retornado
+                filename1 = data.filename;
+                // Mostramos vista previa usando el base64 devuelto
+                imgPreview1.src = data.image;
+                filename1Elem.textContent = filename1;
+                shape1Elem.textContent = data.shape.join(' × ');
+                preview1.style.display = 'block';
+
+                // Habilitamos la sección de operación
+                seccionOperacion.style.display = 'block';
+            } catch (err) {
+                errorSubida1.textContent = 'Error al subir imagen: ' + err.message;
+                errorSubida1.style.display = 'block';
+            }
+        });
+
+        // --------------- SUBIR SEGUNDA IMAGEN (solo para lógicas) ---------------
+        btnSubir2.addEventListener('click', async () => {
+            errorSubida2.style.display = 'none';
+            if (!inputImagen2.files.length) {
+                errorSubida2.textContent = 'Seleccione la segunda imagen.';
+                errorSubida2.style.display = 'block';
+                return;
+            }
+            const file = inputImagen2.files[0];
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const respuesta = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await respuesta.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+                filename2 = data.filename;
+                imgPreview2.src = data.image;
+                filename2Elem.textContent = filename2;
+                shape2Elem.textContent = data.shape.join(' × ');
+                preview2.style.display = 'block';
+            } catch (err) {
+                errorSubida2.textContent = 'Error al subir segunda imagen: ' + err.message;
+                errorSubida2.style.display = 'block';
+            }
+        });
+
+        // --------------- PROCESAR IMAGEN ---------------
+        btnProcesar.addEventListener('click', async () => {
+            // Validaciones mínimas
+            if (!filename1) {
+                alert('Debe subir primero la imagen primaria.');
+                return;
+            }
+            const op = selectOperacion.value;
+            if (!op) {
+                alert('Seleccione una operación antes de procesar.');
+                return;
+            }
+            // Para operaciones lógicas, verificamos segunda imagen
+            if (op === 'logicas' && !filename2) {
+                alert('Para operaciones lógicas debe subir la segunda imagen.');
+                return;
+            }
+
+            // Construimos payload JSON
+            const payload = {
+                filename: filename1,
+                operation: op
+            };
+            // Parámetros según operación
+            switch (op) {
+                case 'histograma':
+                    // No requiere parámetros adicionales
+                    break;
+                case 'canales_rgb':
+                    break;
+                case 'roberts':
+                    break;
+                case 'canny':
+                    payload.low_threshold = parseInt(inputCannyLow.value, 10);
+                    payload.high_threshold = parseInt(inputCannyHigh.value, 10);
+                    break;
+                case 'multiumbral':
+                    payload.classes = parseInt(inputClasses.value, 10);
+                    break;
+                case 'aritmeticas':
+                    payload.escalar = parseFloat(inputEscalar.value);
+                    break;
+                case 'logicas':
+                    payload.filename2 = filename2;
+                    break;
+                case 'ruido_sal_pimienta':
+                    payload.cantidad = parseFloat(document.getElementById('input-cantidad').value);
+                    break;
+                case 'ruido_gaussiano':
+                    payload.sigma = parseFloat(document.getElementById('input-sigma').value);
+                    break;
+                case 'filtros':
+                    payload.filtro_tipo = selectFiltro.value;
+                    break;
+                case 'ecualizacion':
+                    break;
+                default:
+                    alert('Operación desconocida.');
+                    return;
+            }
+
+            // Llamada a /process
+            try {
+                const respuesta = await fetch(`${API_BASE}/process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await respuesta.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Error desconocido en /process');
+                }
+                // Mostramos resultados
+                mostrarResultado(data.result, op);
+            } catch (err) {
+                alert('Error al procesar: ' + err.message);
+            }
+        });
+
+        // --------------- FUNCIÓN PARA MOSTRAR RESULTADOS ---------------
+        function mostrarResultado(resultados, operacion) {
+            // Limpiamos contenido previo
+            resultadoContainer.innerHTML = '';
+            seccionResultado.style.display = 'block';
+
+            // Dependiendo de la operación, puede haber una o varias claves en el objeto resultados
+            // Cada valor es una cadena tipo "data:image/png;base64,…"
+            for (const [clave, valorBase64] of Object.entries(resultados)) {
+                // Creamos un contenedor para cada imagen/figura
+                const div = document.createElement('div');
+                div.classList.add('contenedor-resultado');
+
+                const titulo = document.createElement('h4');
+                titulo.textContent = clave.charAt(0).toUpperCase() + clave.slice(1);
+                div.appendChild(titulo);
+
+                const img = document.createElement('img');
+                img.src = valorBase64;
+                img.alt = `${operacion} - ${clave}`;
+                img.classList.add('resultado-img');
+                div.appendChild(img);
+
+                resultadoContainer.appendChild(div);
+            }
+
+            // Hacemos scroll hasta la sección de resultados
+            seccionResultado.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
