@@ -90,19 +90,11 @@ def multi_otsu_segmentation(image, n_classes=4):
 def segment_cars_advanced_processing(image_path):
     """Versión optimizada de detección de vehículos"""
     
+    
     # 1. Cargar y procesar imagen inicial
     img = cv2.imread(image_path)
     if img is None:
         raise ValueError("No se pudo cargar la imagen")
-    
-    # Redimensionar si es muy grande para ahorrar memoria
-    height, width = img.shape[:2]
-    if width > 1024 or height > 1024:
-        scale = min(1024/width, 1024/height)
-        new_width = int(width * scale)
-        new_height = int(height * scale)
-        img = cv2.resize(img, (new_width, new_height))
-    
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     original_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
@@ -431,7 +423,7 @@ def imagen_a_base64(img):
         pil_img.thumbnail((800, 800), Image.Resampling.LANCZOS)
     
     img_buffer = io.BytesIO()
-    pil_img.save(img_buffer, format='PNG', optimize=True)
+    pil_img.save(img_buffer, format='PNG')
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
     
@@ -446,7 +438,7 @@ def figura_a_base64(fig):
     """Versión optimizada para figuras"""
     img_buffer = io.BytesIO()
     fig.savefig(img_buffer, format='png', bbox_inches='tight', 
-                dpi=80, optimize=True)  
+                dpi=80)  
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
     
