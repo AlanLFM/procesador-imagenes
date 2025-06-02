@@ -262,18 +262,27 @@ def generar_visualizacion_completa(results):
             plt.subplot(2, 3, i + 1)
             plt.title(title, fontsize=9)
             
-            # Redimensionar imagen si es muy grande
             img = steps[step_key]
-            if img.shape[0] > 400 or img.shape[1] > 400:
-                scale = min(400/img.shape[1], 400/img.shape[0])
-                new_size = (int(img.shape[1] * scale), int(img.shape[0] * scale))
+            h, w = img.shape[:2]
+
+            # 1) Si la imagen no existe o tiene dimensión cero, la sustituimos por un pixel en negro
+            if h == 0 or w == 0:
+                img = np.zeros((1, 1), dtype=np.uint8)
+                h, w = 1, 1
+
+            # 2) Redimensionar sólo si alguna dimensión es mayor a 400
+            if h > 400 or w > 400:
+                scale = min(400 / float(w), 400 / float(h))
+                new_w = max(1, int(w * scale))
+                new_h = max(1, int(h * scale))
                 if len(img.shape) == 2:
-                    img = cv2.resize(img, new_size)
+                    img = cv2.resize(img, (new_w, new_h))
                 else:
-                    img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+                    img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
             
             plt.imshow(img, cmap=cmap)
             plt.axis('off')
+
     
     # Resultado final
     plt.subplot(2, 3, 6)
