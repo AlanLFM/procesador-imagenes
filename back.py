@@ -37,6 +37,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
+# Configuración para optimizar memoria
+plt.rcParams['figure.max_open_warning'] = 0
+matplotlib.rcParams['font.size'] = 8
+
 # -------------------------------------------------------------------
 # FUNCIONES DE DETECCIÓN DE VEHÍCULOS (desde m5_ecualizacion.py)
 # -------------------------------------------------------------------
@@ -55,17 +59,25 @@ def roberts_filter(image):
     return magnitude
 
 def ecualizacion_log_hiperbolica_avanzada(img):
-    """Ecualización log-hiperbólica del histograma adaptada para imagen en escala de grises"""
+    """Ecualización log-hiperbólica optimizada"""
     r_min = np.min(img)
     r_max = np.max(img)
+    
+    if r_max == r_min:
+        return img.copy()
     
     hist, bins = np.histogram(img.flatten(), bins=256, range=[0,256], density=True)
     cdf = hist.cumsum()
     
-    cdf_normalizada = cdf * ((r_max - r_min) / (1 if r_max == r_min else (r_max - r_min)))
+    cdf_normalizada = cdf * ((r_max - r_min) / (r_max - r_min))
     transformacion = np.floor(r_min + (r_max - r_min) * cdf_normalizada).astype(np.uint8)
     
     img_ecualizada = transformacion[img]
+    
+    # Limpiar memoria
+    del hist, cdf, cdf_normalizada, transformacion
+    gc.collect()
+    
     return img_ecualizada
 
 def multi_otsu_segmentation(image, n_classes=4):
@@ -75,21 +87,32 @@ def multi_otsu_segmentation(image, n_classes=4):
     return segmented, thresholds
 
 def segment_cars_advanced_processing(image_path):
-    """Segmentación de autos usando procesamiento avanzado"""
+    """Versión optimizada de detección de vehículos"""
     
-    # 1. Cargar imagen
+    # 1. Cargar y procesar imagen inicial
     img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError("No se pudo cargar la imagen")
+    
+    # Redimensionar si es muy grande para ahorrar memoria
+    height, width = img.shape[:2]
+    if width > 1024 or height > 1024:
+        scale = min(1024/width, 1024/height)
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+        img = cv2.resize(img, (new_width, new_height))
+    
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     original_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
-    # 2. Ajuste de brillo y contraste usando ecualización log-hiperbólica
+    # 2. Procesamiento paso a paso con limpieza de memoria
     img_ecualizada = ecualizacion_log_hiperbolica_avanzada(original_gray)
     
-    # Aplicar CLAHE adicional para mejorar contraste local
+    # CLAHE
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced_contrast = clahe.apply(img_ecualizada)
     
-    # Corrección gamma suave
+    # Corrección gamma
     def adjust_gamma(image, gamma=1.1):
         inv_gamma = 1.0 / gamma
         table = np.array([((i / 255.0) ** inv_gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
@@ -97,83 +120,131 @@ def segment_cars_advanced_processing(image_path):
     
     gamma_corrected = adjust_gamma(enhanced_contrast, gamma=1.1)
     
-    # 3. Aplicar GaussianBlur para reducir ruido
-    blur_light = cv2.GaussianBlur(gamma_corrected, (5, 5), 1.0)
-    blur_medium = cv2.GaussianBlur(gamma_corrected, (9, 9), 2.0)
-    blur_heavy = cv2.GaussianBlur(gamma_corrected, (15, 15), 3.0)
+    # 3. Blur (solo uno para ahorrar memoria)
+    blur_img = cv2.GaussianBlur(gamma_corrected, (7, 7), 1.5)
     
-    # 4. Aplicar filtro Roberts para detección de bordes
-    roberts_edges = roberts_filter(blur_light)
+    # 4. Filtro Roberts
+    roberts_edges = roberts_filter(blur_img)
     
-    # 5. Multi-Otsu thresholding
-    segmented_img, thresholds = multi_otsu_segmentation(blur_medium, n_classes=4)
+    # 5. Multi-Otsu con menos clases
+    segmented_img, thresholds = multi_otsu_segmentation(blur_img, n_classes=3)
     
-    # 6. Crear máscaras binarias para diferentes clases
-    masks = []
-    for i in range(len(thresholds) + 1):
-        mask = (segmented_img == i).astype(np.uint8) * 255
-        masks.append(mask)
+    # 6. Crear máscara principal
+    if len(thresholds) > 1:
+        vehicle_mask = ((segmented_img == 1) | (segmented_img == 2)).astype(np.uint8) * 255
+    else:
+        vehicle_mask = segmented_img.astype(np.uint8)
     
-    # 7. Combinar información de bordes y segmentación
-    vehicle_mask = masks[2] if len(masks) > 2 else masks[-1]
+    # 7. Combinar con Roberts
     combined_roberts = cv2.bitwise_and(vehicle_mask, roberts_edges)
     
-    # 8. Operaciones morfológicas avanzadas
-    kernel_ellipse = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-    kernel_rect = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    
-    closed = cv2.morphologyEx(combined_roberts, cv2.MORPH_CLOSE, kernel_ellipse)
-    filled = cv2.morphologyEx(closed, cv2.MORPH_CLOSE, kernel_rect, iterations=2)
-    dilated = cv2.dilate(filled, kernel_ellipse, iterations=1)
+    # 8. Operaciones morfológicas simplificadas
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    morphology_result = cv2.morphologyEx(combined_roberts, cv2.MORPH_CLOSE, kernel, iterations=2)
+    morphology_result = cv2.dilate(morphology_result, kernel, iterations=1)
     
     # 9. Encontrar contornos
-    contours, hierarchy = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(morphology_result, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    # 10. Filtrado avanzado de contornos
+    # 10. Filtrado de contornos optimizado
     car_contours = []
     car_info = []
     
     img_area = img.shape[0] * img.shape[1]
-    min_area = img_area * 0.001
-    max_area = img_area * 0.1
+    min_area = img_area * 0.002  # Área mínima más grande
+    max_area = img_area * 0.08   # Área máxima más pequeña
     
-    for i, contour in enumerate(contours):
+    for contour in contours:
         area = cv2.contourArea(contour)
         
         if min_area < area < max_area:
             x, y, w, h = cv2.boundingRect(contour)
-            aspect_ratio = w / h
+            aspect_ratio = w / h if h > 0 else 0
             
-            moments = cv2.moments(contour)
-            if moments['m00'] != 0:
-                cx = int(moments['m10'] / moments['m00'])
-                cy = int(moments['m01'] / moments['m00'])
-            else:
-                cx, cy = x + w//2, y + h//2
-            
-            hull = cv2.convexHull(contour)
-            hull_area = cv2.contourArea(hull)
-            solidity = area / hull_area if hull_area > 0 else 0
-            extent = area / (w * h)
-            
-            if (1.2 < aspect_ratio < 4.0 and
-                0.4 < solidity < 0.95 and
-                0.3 < extent < 0.8 and
-                y > img.shape[0] * 0.3):
+            # Filtros básicos más estrictos
+            if (1.2 < aspect_ratio < 3.5 and
+                y > img.shape[0] * 0.4 and  # Solo parte inferior
+                w > 20 and h > 15):  # Tamaño mínimo
                 
-                car_contours.append(contour)
-                car_info.append({
-                    'area': area,
-                    'aspect_ratio': aspect_ratio,
-                    'solidity': solidity,
-                    'extent': extent,
-                    'center': (cx, cy),
-                    'bbox': (x, y, w, h)
-                })
+                moments = cv2.moments(contour)
+                if moments['m00'] != 0:
+                    cx = int(moments['m10'] / moments['m00'])
+                    cy = int(moments['m01'] / moments['m00'])
+                else:
+                    cx, cy = x + w//2, y + h//2
+                
+                hull = cv2.convexHull(contour)
+                hull_area = cv2.contourArea(hull)
+                solidity = area / hull_area if hull_area > 0 else 0
+                extent = area / (w * h) if (w * h) > 0 else 0
+                
+                if solidity > 0.3 and extent > 0.2:
+                    car_contours.append(contour)
+                    car_info.append({
+                        'area': area,
+                        'aspect_ratio': aspect_ratio,
+                        'solidity': solidity,
+                        'extent': extent,
+                        'center': (cx, cy),
+                        'bbox': (x, y, w, h)
+                    })
     
-    # 11. Eliminar duplicados
+    # 11. Eliminar duplicados simplificado
     final_contours = []
     final_info = []
+    
+    for i, (contour, info) in enumerate(zip(car_contours, car_info)):
+        is_duplicate = False
+        x1, y1, w1, h1 = info['bbox']
+        
+        for existing_info in final_info:
+            x2, y2, w2, h2 = existing_info['bbox']
+            
+            # Verificar solapamiento simple
+            if (abs(x1 - x2) < max(w1, w2) * 0.5 and 
+                abs(y1 - y2) < max(h1, h2) * 0.5):
+                if info['area'] <= existing_info['area']:
+                    is_duplicate = True
+                    break
+        
+        if not is_duplicate:
+            final_contours.append(contour)
+            final_info.append(info)
+    
+    # 12. Crear imagen resultado
+    result_img = img_rgb.copy()
+    
+    for i, (contour, info) in enumerate(zip(final_contours, final_info)):
+        cv2.drawContours(result_img, [contour], -1, (0, 255, 0), 2)
+        
+        x, y, w, h = info['bbox']
+        cv2.rectangle(result_img, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        
+        label = f'Auto {i+1}'
+        cv2.putText(result_img, label, (x, y-10), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        
+        cx, cy = info['center']
+        cv2.circle(result_img, (cx, cy), 3, (0, 0, 255), -1)
+    
+    # Limpiar memoria antes de retornar
+    del img, vehicle_mask, combined_roberts, contours
+    gc.collect()
+    return {
+        'result_image': result_img,
+        'car_contours': final_contours,
+        'car_info': final_info,
+        'processing_steps': {
+            'original': original_gray,
+            'ecualizacion_log': img_ecualizada,
+            'enhanced_contrast': enhanced_contrast,
+            'gamma_corrected': gamma_corrected,
+            'roberts_edges': roberts_edges,
+            'segmented': segmented_img,
+            'morphology_result': morphology_result
+        },
+        'thresholds': thresholds
+    }
     
     for i, (contour, info) in enumerate(zip(car_contours, car_info)):
         is_duplicate = False
@@ -241,59 +312,51 @@ def segment_cars_advanced_processing(image_path):
     }
 
 def generar_visualizacion_completa(results):
-    """Generar visualización completa de todos los pasos del procesamiento"""
+    """Versión optimizada de visualización - más pequeña y eficiente"""
     steps = results['processing_steps']
     
-    # Crear figura grande
-    fig = plt.figure(figsize=(20, 16))
+    # Crear figura más pequeña
+    fig = plt.figure(figsize=(12, 8), dpi=80)  # Reducido de 20x16 a 12x8
     
-    # Configurar subplots
+    # Solo mostrar los pasos más importantes
     plots_config = [
-        ('original', 'Original Grayscale', 'gray'),
-        ('ecualizacion_log', 'Ecualización Log-Hiperbólica', 'gray'),
-        ('enhanced_contrast', 'CLAHE Enhanced', 'gray'),
-        ('gamma_corrected', 'Gamma Corrected', 'gray'),
-        ('blur_light', 'GaussianBlur (σ=1.0)', 'gray'),
-        ('blur_medium', 'GaussianBlur (σ=2.0)', 'gray'),
-        ('roberts_edges', 'Filtro Roberts', 'gray'),
-        ('segmented', 'Multi-Otsu Segmentation', 'tab10'),
-        ('combined_roberts', 'Roberts + Segmentación', 'gray'),
-        ('morphology_result', 'Operaciones Morfológicas', 'gray')
+        ('original', 'Original', 'gray'),
+        ('ecualizacion_log', 'Equalizado', 'gray'),
+        ('roberts_edges', 'Bordes Roberts', 'gray'),
+        ('segmented', 'Segmentación', 'tab10'),
+        ('morphology_result', 'Morfología', 'gray'),
     ]
     
-    # Plotear pasos del procesamiento
+    # 2x3 grid en lugar de 4x4
     for i, (step_key, title, cmap) in enumerate(plots_config):
-        if step_key in steps:
-            plt.subplot(4, 4, i + 1)
-            plt.title(title, fontsize=10)
-            plt.imshow(steps[step_key], cmap=cmap)
+        if step_key in steps and i < 5:
+            plt.subplot(2, 3, i + 1)
+            plt.title(title, fontsize=9)
+            
+            # Redimensionar imagen si es muy grande
+            img = steps[step_key]
+            if img.shape[0] > 400 or img.shape[1] > 400:
+                scale = min(400/img.shape[1], 400/img.shape[0])
+                new_size = (int(img.shape[1] * scale), int(img.shape[0] * scale))
+                if len(img.shape) == 2:
+                    img = cv2.resize(img, new_size)
+                else:
+                    img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+            
+            plt.imshow(img, cmap=cmap)
             plt.axis('off')
     
-    # Mostrar algunas máscaras
-    for i, mask in enumerate(steps['masks'][:3]):
-        plt.subplot(4, 4, 11 + i)
-        plt.title(f'Máscara Clase {i}', fontsize=10)
-        plt.imshow(mask, cmap='gray')
-        plt.axis('off')
-    
     # Resultado final
-    plt.subplot(4, 4, 14)
-    plt.title('Resultado Final', fontsize=10)
-    plt.imshow(results['result_image'])
+    plt.subplot(2, 3, 6)
+    plt.title('Resultado Final', fontsize=9)
+    result_img = results['result_image']
+    if result_img.shape[0] > 400 or result_img.shape[1] > 400:
+        scale = min(400/result_img.shape[1], 400/result_img.shape[0])
+        new_size = (int(result_img.shape[1] * scale), int(result_img.shape[0] * scale))
+        result_img = cv2.resize(result_img, new_size, interpolation=cv2.INTER_AREA)
+    
+    plt.imshow(result_img)
     plt.axis('off')
-    
-    # Histogramas comparativos
-    plt.subplot(4, 4, 15)
-    plt.title('Histograma Original', fontsize=10)
-    plt.hist(steps['original'].ravel(), 256, [0, 256], alpha=0.7, color='blue')
-    plt.xlabel('Intensidad')
-    plt.ylabel('Frecuencia')
-    
-    plt.subplot(4, 4, 16)
-    plt.title('Histograma Ecualizado', fontsize=10)
-    plt.hist(steps['ecualizacion_log'].ravel(), 256, [0, 256], alpha=0.7, color='green')
-    plt.xlabel('Intensidad')
-    plt.ylabel('Frecuencia')
     
     plt.tight_layout()
     return fig
@@ -417,23 +480,45 @@ def aplicar_filtros(img, filtro_tipo):
         return img
 
 def imagen_a_base64(img):
+    """Versión optimizada con compresión"""
     if len(img.shape) == 3:
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     else:
         img_rgb = img
+    
+    # Reducir calidad para ahorrar memoria
     pil_img = Image.fromarray(img_rgb)
+    
+    # Redimensionar si es muy grande
+    if pil_img.size[0] > 800 or pil_img.size[1] > 800:
+        pil_img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+    
     img_buffer = io.BytesIO()
-    pil_img.save(img_buffer, format='PNG')
+    pil_img.save(img_buffer, format='PNG', optimize=True)
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+    
+    # Limpiar
+    img_buffer.close()
+    del pil_img, img_buffer
+    gc.collect()
+    
     return f"data:image/png;base64,{img_base64}"
 
 def figura_a_base64(fig):
+    """Versión optimizada para figuras"""
     img_buffer = io.BytesIO()
-    fig.savefig(img_buffer, format='png', bbox_inches='tight')
+    fig.savefig(img_buffer, format='png', bbox_inches='tight', 
+                dpi=80, optimize=True)  
     img_buffer.seek(0)
     img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+    
+    # Limpiar memoria
+    img_buffer.close()
     plt.close(fig)
+    del fig
+    gc.collect()
+    
     return f"data:image/png;base64,{img_base64}"
 
 # -------------------------------------------------------------------
@@ -474,7 +559,7 @@ def upload_image():
 
 @app.route('/process', methods=['POST'])
 def process_image():
-    """Procesar imagen según el tipo de operación"""
+    """Versión optimizada del procesamiento"""
     data = request.get_json()
 
     if not data or 'filename' not in data or 'operation' not in data:
@@ -487,53 +572,46 @@ def process_image():
     if not os.path.exists(filepath):
         return jsonify({'error': 'Archivo no encontrado'}), 404
 
-    img = cv2.imread(filepath)
-    if img is None:
-        return jsonify({'error': 'No se pudo cargar la imagen'}), 400
-
     try:
         result = {}
 
         if operation == 'deteccion_vehiculos':
-            # Aplicar detección avanzada de vehículos
-            vehicle_results = segment_cars_advanced_processing(filepath)
+            # Aplicar detección optimizada
+            vehicle_results = segment_cars_optimized(filepath)
             
-            # Generar visualización completa
-            fig_completa = generar_visualizacion_completa(vehicle_results)
+            # Generar visualización optimizada
+            fig_completa = generar_visualizacion_optimizada(vehicle_results)
             
             # Convertir a base64
             result['imagen_final'] = imagen_a_base64(vehicle_results['result_image'])
             result['visualizacion_completa'] = figura_a_base64(fig_completa)
             
-            # Información de vehículos detectados
+            # Información básica
             result['num_vehiculos'] = len(vehicle_results['car_info'])
             result['umbrales_otsu'] = [float(t) for t in vehicle_results['thresholds']]
             
-            # Detalles de cada vehículo
+            # Solo información esencial de vehículos
             vehiculos_info = []
             for i, info in enumerate(vehicle_results['car_info']):
                 vehiculos_info.append({
                     'id': i + 1,
-                    'area': float(info['area']),
-                    'aspect_ratio': float(info['aspect_ratio']),
-                    'solidity': float(info['solidity']),
-                    'extent': float(info['extent']),
+                    'area': int(info['area']),
                     'center': info['center'],
                     'bbox': info['bbox']
                 })
             result['vehiculos'] = vehiculos_info
             
-            # Pasos individuales del procesamiento
+            # Solo pasos esenciales
             steps = vehicle_results['processing_steps']
             result['pasos_procesamiento'] = {
                 'original': imagen_a_base64(steps['original']),
-                'ecualizacion_log': imagen_a_base64(steps['ecualizacion_log']),
-                'enhanced_contrast': imagen_a_base64(steps['enhanced_contrast']),
                 'roberts_edges': imagen_a_base64(steps['roberts_edges']),
-                'segmented': imagen_a_base64(steps['segmented']),
                 'morphology_result': imagen_a_base64(steps['morphology_result'])
             }
-
+            
+            # Limpiar memoria
+            del vehicle_results, steps
+            gc.collect()
         elif operation == 'histograma':
             if len(img.shape) == 3:
                 hist_r, hist_g, hist_b, hist_gray = calcular_histograma(img)
