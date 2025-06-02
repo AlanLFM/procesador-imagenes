@@ -17,6 +17,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import warnings
+import gc
 warnings.filterwarnings('ignore')
 
 # Configurar Flask
@@ -230,6 +231,7 @@ def segment_cars_advanced_processing(image_path):
     # Limpiar memoria antes de retornar
     del img, vehicle_mask, combined_roberts, contours
     gc.collect()
+    
     return {
         'result_image': result_img,
         'car_contours': final_contours,
@@ -242,71 +244,6 @@ def segment_cars_advanced_processing(image_path):
             'roberts_edges': roberts_edges,
             'segmented': segmented_img,
             'morphology_result': morphology_result
-        },
-        'thresholds': thresholds
-    }
-    
-    for i, (contour, info) in enumerate(zip(car_contours, car_info)):
-        is_duplicate = False
-        x1, y1, w1, h1 = info['bbox']
-        
-        for j, existing_info in enumerate(final_info):
-            x2, y2, w2, h2 = existing_info['bbox']
-            
-            x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
-            y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
-            intersection = x_overlap * y_overlap
-            union = w1 * h1 + w2 * h2 - intersection
-            
-            if union > 0:
-                iou = intersection / union
-                if iou > 0.3:
-                    if info['area'] <= existing_info['area']:
-                        is_duplicate = True
-                        break
-                    else:
-                        final_contours[j] = contour
-                        final_info[j] = info
-                        is_duplicate = True
-                        break
-        
-        if not is_duplicate:
-            final_contours.append(contour)
-            final_info.append(info)
-    
-    # 12. Crear imagen resultado
-    result_img = img_rgb.copy()
-    
-    for i, (contour, info) in enumerate(zip(final_contours, final_info)):
-        cv2.drawContours(result_img, [contour], -1, (0, 255, 0), 2)
-        
-        x, y, w, h = info['bbox']
-        cv2.rectangle(result_img, (x, y), (x + w, y + h), (255, 0, 0), 2)
-        
-        label = f'Auto {i+1}'
-        cv2.putText(result_img, label, (x, y-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-        
-        cx, cy = info['center']
-        cv2.circle(result_img, (cx, cy), 3, (0, 0, 255), -1)
-    
-    return {
-        'result_image': result_img,
-        'car_contours': final_contours,
-        'car_info': final_info,
-        'processing_steps': {
-            'original': original_gray,
-            'ecualizacion_log': img_ecualizada,
-            'enhanced_contrast': enhanced_contrast,
-            'gamma_corrected': gamma_corrected,
-            'blur_light': blur_light,
-            'blur_medium': blur_medium,
-            'blur_heavy': blur_heavy,
-            'roberts_edges': roberts_edges,
-            'segmented': segmented_img,
-            'masks': masks,
-            'combined_roberts': combined_roberts,
-            'morphology_result': dilated
         },
         'thresholds': thresholds
     }
@@ -572,15 +509,19 @@ def process_image():
     if not os.path.exists(filepath):
         return jsonify({'error': 'Archivo no encontrado'}), 404
 
+    img = cv2.imread(filepath)
+    if img is None:
+        return jsonify({'error': 'No se pudo cargar la imagen'}), 400
+
     try:
         result = {}
 
         if operation == 'deteccion_vehiculos':
             # Aplicar detección optimizada
-            vehicle_results = segment_cars_optimized(filepath)
+            vehicle_results = segment_cars_advanced_processing(filepath)
             
             # Generar visualización optimizada
-            fig_completa = generar_visualizacion_optimizada(vehicle_results)
+            fig_completa = generar_visualizacion_completa(vehicle_results)
             
             # Convertir a base64
             result['imagen_final'] = imagen_a_base64(vehicle_results['result_image'])
