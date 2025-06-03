@@ -40,6 +40,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 # -------------------------------------------------------------------
 # NUEVA FUNCIÓN: Segmentación de autos (adaptada de Ideal.py)
 # -------------------------------------------------------------------
+
 def segment_cars_classical(img):
     """
     Segmentación clásica de autos usando OpenCV y procesamiento de contornos.
@@ -49,7 +50,7 @@ def segment_cars_classical(img):
         img: imagen BGR de OpenCV
     
     Returns:
-        dict con las imágenes de cada etapa y el resultado final
+        dict con el resultado final y conteo de autos
     """
     # 1. Convertir a RGB para visualización
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -113,69 +114,23 @@ def segment_cars_classical(img):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
     
     return {
-        'original': img_rgb,
-        'gray': gray,
-        'blurred': blurred,
-        'edges': edges,
-        'closed': closed,
-        'dilated': dilated,
         'result': result_img,
         'car_count': len(car_contours),
         'contours': car_contours
     }
 
+
 def create_segmentation_process_visualization(segmentation_data):
     """
-    Crear una visualización completa del proceso de segmentación
+    Crear una visualización simple mostrando solo el resultado final
     """
-    fig, axes = plt.subplots(2, 4, figsize=(16, 8))
-    axes = axes.ravel()
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
     
-    # 1. Imagen original en RGB
-    axes[0].imshow(segmentation_data['original'])
-    axes[0].set_title("Original (RGB)")
-    axes[0].axis("off")
-    
-    # 2. Escala de grises
-    axes[1].imshow(segmentation_data['gray'], cmap="gray")
-    axes[1].set_title("Escala de grises")
-    axes[1].axis("off")
-    
-    # 3. Imagen desenfocada (GaussianBlur)
-    axes[2].imshow(segmentation_data['blurred'], cmap="gray")
-    axes[2].set_title("GaussianBlur")
-    axes[2].axis("off")
-    
-    # 4. Bordes (Canny)
-    axes[3].imshow(segmentation_data['edges'], cmap="gray")
-    axes[3].set_title("Canny (bordes)")
-    axes[3].axis("off")
-    
-    # 5. Cerrado morfológico con vecindad 4
-    axes[4].imshow(segmentation_data['closed'], cmap="gray")
-    axes[4].set_title("Cierre (Vecindad 4)")
-    axes[4].axis("off")
-    
-    # 6. Dilatación con vecindad 8
-    axes[5].imshow(segmentation_data['dilated'], cmap="gray")
-    axes[5].set_title("Dilatación (Vecindad 8)")
-    axes[5].axis("off")
-    
-    # 7. Resultado final con contornos y bounding boxes
-    axes[6].imshow(segmentation_data['result'])
-    axes[6].set_title(f"Resultado final\n({segmentation_data['car_count']} autos detectados)")
-    axes[6].axis("off")
-    
-    # 8. Kernels utilizados
-    kernel_4 = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=np.uint8)
-    kernel_8 = np.ones((3, 3), dtype=np.uint8)
-    
-    axes[7].text(0.1, 0.8, "Kernels utilizados:", fontsize=12, weight='bold', transform=axes[7].transAxes)
-    axes[7].text(0.1, 0.6, "Vecindad 4 (Cierre):\n[[0,1,0]\n [1,1,1]\n [0,1,0]]", 
-                fontsize=10, transform=axes[7].transAxes, family='monospace')
-    axes[7].text(0.1, 0.2, "Vecindad 8 (Dilatación):\n[[1,1,1]\n [1,1,1]\n [1,1,1]]", 
-                fontsize=10, transform=axes[7].transAxes, family='monospace')
-    axes[7].axis("off")
+    # Mostrar solo el resultado final con contornos y bounding boxes
+    ax.imshow(segmentation_data['result'])
+    ax.set_title(f"Detección de Vehículos - {segmentation_data['car_count']} vehículos detectados", 
+                 fontsize=14, fontweight='bold')
+    ax.axis("off")
     
     plt.tight_layout()
     return fig
@@ -378,17 +333,15 @@ def process_image():
         if operation == 'deteccion_vehiculos':
             segmentation_data = segment_cars_classical(img)
             
-            # Crear visualización del proceso completo
+            # Crear visualización simple del resultado final
             process_fig = create_segmentation_process_visualization(segmentation_data)
             
+            # Solo enviar el resultado final
             result['result'] = imagen_a_base64(segmentation_data['result'])
-            result['process_visualization'] = figura_a_base64(process_fig)
             result['car_count'] = segmentation_data['car_count']
-            result['gray'] = imagen_a_base64(segmentation_data['gray'])
-            result['blurred'] = imagen_a_base64(segmentation_data['blurred'])
-            result['edges'] = imagen_a_base64(segmentation_data['edges'])
-            result['closed'] = imagen_a_base64(segmentation_data['closed'])
-            result['dilated'] = imagen_a_base64(segmentation_data['dilated'])
+            
+            # Opcional: también enviar la visualización como figura si la quieres mostrar
+            # result['process_visualization'] = figura_a_base64(process_fig)
 
         elif operation == 'histograma':
             if len(img.shape) == 3:
