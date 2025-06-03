@@ -2,303 +2,649 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Procesador de Imágenes</title>
-    <link rel="stylesheet" href="/static/estilos.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .section {
+            background: white;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .section h2 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        input[type="file"], select, input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input[type="file"]:focus, select:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .preview-container {
+            margin-top: 20px;
+            padding: 20px;
+            border: 2px dashed #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .preview-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+
+        .alert.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .alert.success {
+            background: #c6f6d5;
+            color: #2d7d32;
+            border: 1px solid #9ae6b4;
+        }
+
+        .parametros {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .parametros label {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .param-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .param-row input {
+            flex: 1;
+        }
+
+        .resultado-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .contenedor-resultado {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .contenedor-resultado h4 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .resultado-img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 0 20px;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            color: #cbd5e0;
+            font-weight: 600;
+        }
+
+        .step.active {
+            color: #667eea;
+        }
+
+        .step.completed {
+            color: #48bb78;
+        }
+
+        .step-number {
+            background: #cbd5e0;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .step.active .step-number {
+            background: #667eea;
+        }
+
+        .step.completed .step-number {
+            background: #48bb78;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            header h1 {
+                font-size: 2em;
+            }
+            
+            .param-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .step-indicator {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <h1>Procesador de Imágenes</h1>
-        <p>Seleccione una imagen, elija la operación y visualice el resultado.</p>
-    </header>
+    <div class="container">
+        <header>
+            <h1>🖼️ Procesador de Imágenes</h1>
+            <p>Seleccione una imagen, elija la operación y visualice el resultado.</p>
+        </header>
 
-    <main>
+        <div class="step-indicator">
+            <div class="step active" id="step1">
+                <div class="step-number">1</div>
+                <span>Subir Imagen</span>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <span>Seleccionar Operación</span>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <span>Ver Resultados</span>
+            </div>
+        </div>
+
         <!-- 1. Sección de subida de imagen primaria -->
-        <section id="seccion-subida">
-            <h2>1. Subir imagen primaria</h2>
-            <input type="file" id="input-imagen1" accept="image/*">
-            <button id="btn-subir1">Subir imagen</button>
-            <div id="preview-imagen1" class="preview-container" style="display: none;">
+        <section class="section" id="seccion-subida">
+            <h2>📁 Subir imagen primaria</h2>
+            <div class="form-group">
+                <label for="input-imagen1">Seleccionar archivo de imagen:</label>
+                <input type="file" id="input-imagen1" accept="image/*">
+            </div>
+            <button class="btn" id="btn-subir1">Subir imagen</button>
+            <div id="preview-imagen1" class="preview-container hidden">
                 <h3>Vista previa de la imagen primaria:</h3>
                 <img id="img-preview1" alt="Preview Imagen 1">
-                <p><strong>Nombre de archivo asignado:</strong> <span id="filename1"></span></p>
-                <p><strong>Dimensiones (HxWxCanales):</strong> <span id="shape1"></span></p>
+                <p><strong>Nombre de archivo:</strong> <span id="filename1"></span></p>
+                <p><strong>Dimensiones:</strong> <span id="shape1"></span></p>
             </div>
-            <div id="error-subida1" class="alert error" style="display: none;"></div>
+            <div id="error-subida1" class="alert error hidden"></div>
         </section>
-
-        <hr>
 
         <!-- 2. Sección de selección de operación y parámetros -->
-        <section id="seccion-operacion" style="display: none;">
-            <h2>2. Seleccione la operación</h2>
-            <form id="form-operacion">
+        <section class="section hidden" id="seccion-operacion">
+            <h2>⚙️ Seleccione la operación</h2>
+            <div class="form-group">
+                <label for="select-operacion">Operación:</label>
+                <select id="select-operacion" name="operation">
+                    <option value="" disabled selected>-- Elija una operación --</option>
+                    <option value="histograma">📊 Histograma</option>
+                    <option value="deteccion_vehiculos">🚗 Detección de vehículos</option>
+                    <option value="canales_rgb">🌈 Canales RGB</option>
+                    <option value="roberts">🔍 Filtro Roberts</option>
+                    <option value="canny">📐 Detector Canny</option>
+                    <option value="multiumbral">🎯 Multiumbralización</option>
+                    <option value="aritmeticas">➕ Operaciones Aritméticas</option>
+                    <option value="logicas">🔀 Operaciones Lógicas</option>
+                    <option value="ruido_sal_pimienta">🧂 Ruido Sal y Pimienta</option>
+                    <option value="ruido_gaussiano">📈 Ruido Gaussiano</option>
+                    <option value="filtros">🎚️ Filtros</option>
+                    <option value="ecualizacion">⚖️ Ecualización</option>
+                </select>
+            </div>
+
+            <!-- Parámetros adicionales -->
+            <div id="param-canny" class="parametros hidden">
+                <label>Umbrales Canny:</label>
+                <div class="param-row">
+                    <input type="number" id="canny-low" placeholder="Umbral bajo" value="50" min="0" max="255">
+                    <input type="number" id="canny-high" placeholder="Umbral alto" value="150" min="0" max="255">
+                </div>
+            </div>
+
+            <div id="param-multiumbral" class="parametros hidden">
+                <label for="input-classes">Número de clases (2–10):</label>
+                <input type="number" id="input-classes" value="3" min="2" max="10">
+            </div>
+
+            <div id="param-aritmeticas" class="parametros hidden">
+                <label for="input-escalar">Valor escalar:</label>
+                <input type="number" id="input-escalar" value="50" step="1">
+            </div>
+
+            <div id="param-logicas" class="parametros hidden">
+                <p><strong>⚠️ Operación lógica requiere segunda imagen</strong></p>
                 <div class="form-group">
-                    <label for="select-operacion">Operación:</label>
-                    <select id="select-operacion" name="operation">
-                        <option value="" disabled selected>-- Elija una operación --</option>
-                        <option value="histograma">Histograma</option>
-                        <option value="canales_rgb">Canales RGB</option>
-                        <option value="roberts">Filtro Roberts</option>
-                        <option value="canny">Detector Canny</option>
-                        <option value="multiumbral">Multiumbralización</option>
-                        <option value="aritmeticas">Operaciones Aritméticas</option>
-                        <option value="logicas">Operaciones Lógicas</option>
-                        <option value="ruido_sal_pimienta">Ruido Sal y Pimienta</option>
-                        <option value="ruido_gaussiano">Ruido Gaussiano</option>
-                        <option value="filtros">Filtros (Gaussiano/Promedio/Mediana)</option>
-                        <option value="ecualizacion">Ecualización Log-Hiperbólica</option>
-                    </select>
-                </div>
-
-                <!-- Parámetros adicionales -->
-                <div id="param-canny" class="form-group parametros" style="display: none;">
-                    <label>Umbrales Canny:</label>
-                    <input type="number" id="canny-low" placeholder="Low threshold (p.ej. 50)" value="50" min="0" max="255">
-                    <input type="number" id="canny-high" placeholder="High threshold (p.ej. 150)" value="150" min="0" max="255">
-                </div>
-
-                <div id="param-multiumbral" class="form-group parametros" style="display: none;">
-                    <label for="input-classes">Número de clases (2–10):</label>
-                    <input type="number" id="input-classes" value="3" min="2" max="10">
-                </div>
-
-                <div id="param-aritmeticas" class="form-group parametros" style="display: none;">
-                    <label for="input-escalar">Escalar (valor numérico):</label>
-                    <input type="number" id="input-escalar" value="50" step="1">
-                </div>
-
-                <div id="param-logicas" class="form-group parametros" style="display: none;">
-                    <p>Operación lógica requiere <strong>segunda imagen</strong>.</p>
+                    <label for="input-imagen2">Segunda imagen:</label>
                     <input type="file" id="input-imagen2" accept="image/*">
-                    <button type="button" id="btn-subir2">Subir segunda imagen</button>
-                    <div id="preview-imagen2" class="preview-container" style="display: none;">
-                        <h4>Vista previa de la segunda imagen:</h4>
-                        <img id="img-preview2" alt="Preview Imagen 2">
-                        <p><strong>Nombre de archivo asignado:</strong> <span id="filename2"></span></p>
-                        <p><strong>Dimensiones (HxWxCanales):</strong> <span id="shape2"></span></p>
-                    </div>
-                    <div id="error-subida2" class="alert error" style="display: none;"></div>
                 </div>
+                <button type="button" class="btn" id="btn-subir2">Subir segunda imagen</button>
+                <div id="preview-imagen2" class="preview-container hidden">
+                    <h4>Vista previa de la segunda imagen:</h4>
+                    <img id="img-preview2" alt="Preview Imagen 2">
+                    <p><strong>Nombre de archivo:</strong> <span id="filename2"></span></p>
+                    <p><strong>Dimensiones:</strong> <span id="shape2"></span></p>
+                </div>
+                <div id="error-subida2" class="alert error hidden"></div>
+            </div>
 
-                <div id="param-ruido-salpimi" class="form-group parametros" style="display: none;">
-                    <label for="input-cantidad">Cantidad de ruido (0.0 – 1.0):</label>
-                    <input type="number" id="input-cantidad" value="0.05" step="0.01" min="0" max="1">
-                </div>
+            <div id="param-ruido-salpimi" class="parametros hidden">
+                <label for="input-cantidad">Cantidad de ruido (0.0 – 1.0):</label>
+                <input type="number" id="input-cantidad" value="0.05" step="0.01" min="0" max="1">
+            </div>
 
-                <div id="param-ruido-gauss" class="form-group parametros" style="display: none;">
-                    <label for="input-sigma">Sigma (p.ej. 25):</label>
-                    <input type="number" id="input-sigma" value="25" step="1" min="0">
-                </div>
+            <div id="param-ruido-gauss" class="parametros hidden">
+                <label for="input-sigma">Sigma:</label>
+                <input type="number" id="input-sigma" value="25" step="1" min="0">
+            </div>
 
-                <div id="param-filtros" class="form-group parametros" style="display: none;">
-                    <label for="select-filtro">Tipo de filtro:</label>
-                    <select id="select-filtro">
-                        <option value="gaussiano">Gaussiano</option>
-                        <option value="promedio">Promedio</option>
-                        <option value="mediana">Mediana</option>
-                    </select>
-                </div>
+            <div id="param-filtros" class="parametros hidden">
+                <label for="select-filtro">Tipo de filtro:</label>
+                <select id="select-filtro">
+                    <option value="gaussiano">Gaussiano</option>
+                    <option value="promedio">Promedio</option>
+                    <option value="mediana">Mediana</option>
+                </select>
+            </div>
 
-                <div class="form-group">
-                    <button type="button" id="btn-procesar">Procesar imagen</button>
-                </div>
-            </form>
+            <div class="form-group">
+                <button type="button" class="btn" id="btn-procesar">🚀 Procesar imagen</button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Procesando imagen, por favor espere...</p>
+            </div>
         </section>
-
-        <hr>
 
         <!-- 3. Sección de visualización de resultados -->
-        <section id="seccion-resultado" style="display: none;">
-            <h2>3. Resultado</h2>
-            <div id="resultado-container"></div>
+        <section class="section hidden" id="seccion-resultado">
+            <h2>✨ Resultados</h2>
+            <div id="resultado-container" class="resultado-container"></div>
         </section>
-    </main>
 
-    <footer>
-        <p>&copy; 2025 – Comunidad rosa</p>
-    </footer>
+        <footer>
+            <p>&copy; 2025 – Comunidad rosa 🌸</p>
+        </footer>
+    </div>
 
     <script>
         // URL base de la API Flask
-        const API_BASE = 'https://procesador-imagenes-umhm.onrender.com/';
+        //http://localhost:5000
+        //https://procesador-imagenes-umhm.onrender.com
+        const API_BASE = 'https://procesador-imagenes-umhm.onrender.com';
 
         // Elementos del DOM
-        const inputImagen1    = document.getElementById('input-imagen1');
-        const btnSubir1       = document.getElementById('btn-subir1');
-        const preview1        = document.getElementById('preview-imagen1');
-        const imgPreview1     = document.getElementById('img-preview1');
-        const filename1Elem   = document.getElementById('filename1');
-        const shape1Elem      = document.getElementById('shape1');
-        const errorSubida1    = document.getElementById('error-subida1');
+        const inputImagen1 = document.getElementById('input-imagen1');
+        const btnSubir1 = document.getElementById('btn-subir1');
+        const preview1 = document.getElementById('preview-imagen1');
+        const imgPreview1 = document.getElementById('img-preview1');
+        const filename1Elem = document.getElementById('filename1');
+        const shape1Elem = document.getElementById('shape1');
+        const errorSubida1 = document.getElementById('error-subida1');
 
         const seccionOperacion = document.getElementById('seccion-operacion');
-        const selectOperacion  = document.getElementById('select-operacion');
+        const selectOperacion = document.getElementById('select-operacion');
 
-        const paramCanny        = document.getElementById('param-canny');
-        const paramMulti        = document.getElementById('param-multiumbral');
-        const paramArit         = document.getElementById('param-aritmeticas');
-        const paramLog          = document.getElementById('param-logicas');
-        const paramRuidoSal     = document.getElementById('param-ruido-salpimi');
-        const paramRuidoGau     = document.getElementById('param-ruido-gauss');
-        const paramFiltros      = document.getElementById('param-filtros');
+        const inputImagen2 = document.getElementById('input-imagen2');
+        const btnSubir2 = document.getElementById('btn-subir2');
+        const preview2 = document.getElementById('preview-imagen2');
+        const imgPreview2 = document.getElementById('img-preview2');
+        const filename2Elem = document.getElementById('filename2');
+        const shape2Elem = document.getElementById('shape2');
+        const errorSubida2 = document.getElementById('error-subida2');
 
-        const inputCannyLow     = document.getElementById('canny-low');
-        const inputCannyHigh    = document.getElementById('canny-high');
-        const inputClasses      = document.getElementById('input-classes');
-        const inputEscalar      = document.getElementById('input-escalar');
-        const inputImagen2      = document.getElementById('input-imagen2');
-        const btnSubir2         = document.getElementById('btn-subir2');
-        const preview2          = document.getElementById('preview-imagen2');
-        const imgPreview2       = document.getElementById('img-preview2');
-        const filename2Elem     = document.getElementById('filename2');
-        const shape2Elem        = document.getElementById('shape2');
-        const errorSubida2      = document.getElementById('error-subida2');
-        const selectFiltro      = document.getElementById('select-filtro');
+        const btnProcesar = document.getElementById('btn-procesar');
+        const loading = document.getElementById('loading');
+        const seccionResultado = document.getElementById('seccion-resultado');
+        const resultadoContainer = document.getElementById('resultado-container');
 
-        const btnProcesar       = document.getElementById('btn-procesar');
-        const seccionResultado  = document.getElementById('seccion-resultado');
-        const resultadoContainer= document.getElementById('resultado-container');
+        // Elementos de pasos
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const step3 = document.getElementById('step3');
 
-        // Variables para almacenar filenames retornados
+        // Variables para almacenar filenames
         let filename1 = null;
         let filename2 = null;
 
-        // Función genérica para mostrar/ocultar secciones según la operación
-        function actualizarParametrosVisibles() {
-            const op = selectOperacion.value;
-            // Ocultar todos los bloques de parámetros
-            document.querySelectorAll('.parametros').forEach(div => div.style.display = 'none');
+        // Función para actualizar pasos
+        function updateSteps(currentStep) {
+            [step1, step2, step3].forEach((step, index) => {
+                step.classList.remove('active', 'completed');
+                if (index < currentStep - 1) {
+                    step.classList.add('completed');
+                } else if (index === currentStep - 1) {
+                    step.classList.add('active');
+                }
+            });
+        }
 
-            if (op === 'canny') {
-                paramCanny.style.display = 'block';
-            } else if (op === 'multiumbral') {
-                paramMulti.style.display = 'block';
-            } else if (op === 'aritmeticas') {
-                paramArit.style.display = 'block';
-            } else if (op === 'logicas') {
-                paramLog.style.display = 'block';
-            } else if (op === 'ruido_sal_pimienta') {
-                paramRuidoSal.style.display = 'block';
-            } else if (op === 'ruido_gaussiano') {
-                paramRuidoGau.style.display = 'block';
-            } else if (op === 'filtros') {
-                paramFiltros.style.display = 'block';
+        // Función para mostrar/ocultar elementos
+        function toggleElement(element, show) {
+            if (show) {
+                element.classList.remove('hidden');
+            } else {
+                element.classList.add('hidden');
             }
         }
 
-        // Cuando cambie la operación, mostramos/ocultamos parámetros
+        // Función para mostrar alertas
+        function showAlert(element, message, type = 'error') {
+            element.textContent = message;
+            element.className = `alert ${type}`;
+            toggleElement(element, true);
+            setTimeout(() => toggleElement(element, false), 5000);
+        }
+
+        // Función para actualizar parámetros visibles
+        function actualizarParametrosVisibles() {
+            const op = selectOperacion.value;
+            document.querySelectorAll('.parametros').forEach(div => toggleElement(div, false));
+
+            const paramMap = {
+                'canny': 'param-canny',
+                'multiumbral': 'param-multiumbral',
+                'aritmeticas': 'param-aritmeticas',
+                'logicas': 'param-logicas',
+                'ruido_sal_pimienta': 'param-ruido-salpimi',
+                'ruido_gaussiano': 'param-ruido-gauss',
+                'filtros': 'param-filtros'
+            };
+
+            if (paramMap[op]) {
+                toggleElement(document.getElementById(paramMap[op]), true);
+            }
+        }
+
         selectOperacion.addEventListener('change', actualizarParametrosVisibles);
 
-        // --------------- SUBIR PRIMERA IMAGEN ---------------
+        // Subir primera imagen
         btnSubir1.addEventListener('click', async () => {
-            errorSubida1.style.display = 'none';
+            toggleElement(errorSubida1, false);
+            
             if (!inputImagen1.files.length) {
-                errorSubida1.textContent = 'Por favor seleccione un archivo antes de subir.';
-                errorSubida1.style.display = 'block';
+                showAlert(errorSubida1, 'Por favor seleccione un archivo antes de subir.');
                 return;
             }
+
             const file = inputImagen1.files[0];
             const formData = new FormData();
             formData.append('image', file);
 
+            btnSubir1.disabled = true;
+            btnSubir1.textContent = 'Subiendo...';
+
             try {
                 const respuesta = await fetch(`${API_BASE}/upload`, {
                     method: 'POST',
                     body: formData
                 });
                 const data = await respuesta.json();
+                
                 if (!data.success) {
                     throw new Error(data.error || 'Error desconocido');
                 }
-                // Guardamos el filename retornado
+
                 filename1 = data.filename;
-                // Mostramos vista previa usando el base64 devuelto
                 imgPreview1.src = data.image;
                 filename1Elem.textContent = filename1;
                 shape1Elem.textContent = data.shape.join(' × ');
-                preview1.style.display = 'block';
+                toggleElement(preview1, true);
+                toggleElement(seccionOperacion, true);
+                
+                updateSteps(2);
+                showAlert(errorSubida1, '¡Imagen subida exitosamente!', 'success');
 
-                // Habilitamos la sección de operación
-                seccionOperacion.style.display = 'block';
             } catch (err) {
-                errorSubida1.textContent = 'Error al subir imagen: ' + err.message;
-                errorSubida1.style.display = 'block';
+                showAlert(errorSubida1, 'Error al subir imagen: ' + err.message);
+            } finally {
+                btnSubir1.disabled = false;
+                btnSubir1.textContent = 'Subir imagen';
             }
         });
 
-        // --------------- SUBIR SEGUNDA IMAGEN (solo para lógicas) ---------------
+        // Subir segunda imagen
         btnSubir2.addEventListener('click', async () => {
-            errorSubida2.style.display = 'none';
+            toggleElement(errorSubida2, false);
+            
             if (!inputImagen2.files.length) {
-                errorSubida2.textContent = 'Seleccione la segunda imagen.';
-                errorSubida2.style.display = 'block';
+                showAlert(errorSubida2, 'Seleccione la segunda imagen.');
                 return;
             }
+
             const file = inputImagen2.files[0];
             const formData = new FormData();
             formData.append('image', file);
 
+            btnSubir2.disabled = true;
+            btnSubir2.textContent = 'Subiendo...';
+
             try {
                 const respuesta = await fetch(`${API_BASE}/upload`, {
                     method: 'POST',
                     body: formData
                 });
                 const data = await respuesta.json();
+                
                 if (!data.success) {
                     throw new Error(data.error || 'Error desconocido');
                 }
+
                 filename2 = data.filename;
                 imgPreview2.src = data.image;
                 filename2Elem.textContent = filename2;
                 shape2Elem.textContent = data.shape.join(' × ');
-                preview2.style.display = 'block';
+                toggleElement(preview2, true);
+                
+                showAlert(errorSubida2, '¡Segunda imagen subida exitosamente!', 'success');
+
             } catch (err) {
-                errorSubida2.textContent = 'Error al subir segunda imagen: ' + err.message;
-                errorSubida2.style.display = 'block';
+                showAlert(errorSubida2, 'Error al subir segunda imagen: ' + err.message);
+            } finally {
+                btnSubir2.disabled = false;
+                btnSubir2.textContent = 'Subir segunda imagen';
             }
         });
 
-        // --------------- PROCESAR IMAGEN ---------------
+        // Procesar imagen
         btnProcesar.addEventListener('click', async () => {
-            // Validaciones mínimas
             if (!filename1) {
                 alert('Debe subir primero la imagen primaria.');
                 return;
             }
+            
             const op = selectOperacion.value;
             if (!op) {
                 alert('Seleccione una operación antes de procesar.');
                 return;
             }
-            // Para operaciones lógicas, verificamos segunda imagen
+            
             if (op === 'logicas' && !filename2) {
                 alert('Para operaciones lógicas debe subir la segunda imagen.');
                 return;
             }
 
-            // Construimos payload JSON
             const payload = {
                 filename: filename1,
                 operation: op
             };
-            // Parámetros según operación
+
+            // Agregar parámetros según operación
             switch (op) {
-                case 'histograma':
-                    // No requiere parámetros adicionales
-                    break;
-                case 'canales_rgb':
-                    break;
-                case 'roberts':
-                    break;
                 case 'canny':
-                    payload.low_threshold = parseInt(inputCannyLow.value, 10);
-                    payload.high_threshold = parseInt(inputCannyHigh.value, 10);
+                    payload.low_threshold = parseInt(document.getElementById('canny-low').value, 10);
+                    payload.high_threshold = parseInt(document.getElementById('canny-high').value, 10);
                     break;
                 case 'multiumbral':
-                    payload.classes = parseInt(inputClasses.value, 10);
+                    payload.classes = parseInt(document.getElementById('input-classes').value, 10);
                     break;
                 case 'aritmeticas':
-                    payload.escalar = parseFloat(inputEscalar.value);
+                    payload.escalar = parseFloat(document.getElementById('input-escalar').value);
                     break;
                 case 'logicas':
                     payload.filename2 = filename2;
@@ -310,43 +656,44 @@
                     payload.sigma = parseFloat(document.getElementById('input-sigma').value);
                     break;
                 case 'filtros':
-                    payload.filtro_tipo = selectFiltro.value;
+                    payload.filtro_tipo = document.getElementById('select-filtro').value;
                     break;
-                case 'ecualizacion':
-                    break;
-                default:
-                    alert('Operación desconocida.');
-                    return;
             }
 
-            // Llamada a /process
+            btnProcesar.disabled = true;
+            toggleElement(loading, true);
+
             try {
                 const respuesta = await fetch(`${API_BASE}/process`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                
                 const data = await respuesta.json();
                 if (!data.success) {
                     throw new Error(data.error || 'Error desconocido en /process');
                 }
-                // Mostramos resultados
+
                 mostrarResultado(data.result, op);
+                updateSteps(3);
+
             } catch (err) {
                 alert('Error al procesar: ' + err.message);
+            } finally {
+                btnProcesar.disabled = false;
+                toggleElement(loading, false);
             }
         });
 
-        // --------------- FUNCIÓN PARA MOSTRAR RESULTADOS ---------------
+        // Mostrar resultados
         function mostrarResultado(resultados, operacion) {
-            // Limpiamos contenido previo
             resultadoContainer.innerHTML = '';
-            seccionResultado.style.display = 'block';
+            toggleElement(seccionResultado, true);
 
-            // Dependiendo de la operación, puede haber una o varias claves en el objeto resultados
-            // Cada valor es una cadena tipo "data:image/png;base64,…"
             for (const [clave, valorBase64] of Object.entries(resultados)) {
-                // Creamos un contenedor para cada imagen/figura
+                if (clave === 'car_count') continue; // Skip el conteo de autos
+
                 const div = document.createElement('div');
                 div.classList.add('contenedor-resultado');
 
@@ -360,12 +707,24 @@
                 img.classList.add('resultado-img');
                 div.appendChild(img);
 
+                // Agregar información del conteo de autos si existe
+                if (operacion === 'deteccion_vehiculos' && resultados.car_count !== undefined) {
+                    const info = document.createElement('p');
+                    info.innerHTML = `<strong>🚗 Vehículos detectados: ${resultados.car_count}</strong>`;
+                    info.style.marginTop = '10px';
+                    info.style.color = '#667eea';
+                    info.style.fontSize = '1.1em';
+                    div.appendChild(info);
+                }
+
                 resultadoContainer.appendChild(div);
             }
 
-            // Hacemos scroll hasta la sección de resultados
             seccionResultado.scrollIntoView({ behavior: 'smooth' });
         }
+
+        // Inicializar
+        updateSteps(1);
     </script>
 </body>
 </html>
